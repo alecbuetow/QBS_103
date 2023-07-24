@@ -1,0 +1,100 @@
+---
+title: "Final_Project_P1"
+output: html_document
+date: "2023-07-24"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{R}
+QBS103_finalProject_geneExpression <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_geneExpression.csv")
+```
+
+```{R}
+QBS103_finalProject_metadata <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_metadata.csv")
+```
+
+gene: APOM
+continuous covariate: procalcitonin.ng.ml..
+categorical covariates: sex, icu_status
+
+```{R}
+library(tidyverse)
+
+#select the gene of interest and convert it into a long format for use in tidyverse plot functions
+APOM_data <- QBS103_finalProject_geneExpression[ QBS103_finalProject_geneExpression$X == 'APOM', ] %>%
+             gather(key = subject, value = APOM_Expression, 2:127)
+
+#plot data as a histogram and choose colors / labels
+ggplot2::ggplot(APOM_data, aes(x = APOM_Expression)) +
+  geom_histogram(fill = 'ForestGreen', col = I('Black')) +
+  labs(x = 'APOM Gene Expression', y = 'Count') +
+  ggtitle("APOM Gene Expression by Frequency of Occurence")
+
+```
+
+```{R}
+#create a dataframe for the continuous variable and rename a column to match the APOM dataframe
+procalcitonin_data <- QBS103_finalProject_metadata[,c('participant_id','procalcitonin.ng.ml..')]
+colnames(procalcitonin_data)[1] ="subject"
+
+#merge the dataframes using the matched column name
+merged_data <- merge(APOM_data, procalcitonin_data, by='subject')
+
+#note that a row is lost due to a mismatch between the datasets
+#COVID_06_.y_male_NonICU in APOM_Expression does not match COVID_06_:y_male_NonICU in procalcitonin
+#in both cases an age is not present, so I opted to exclude this data assuming it was erroneous 
+
+#consider only data with known procalcitonin values, since unkown values cannot be plotted
+merged_data <- subset(merged_data[merged_data$procalcitonin.ng.ml != 'unknown', ])
+```
+
+```{R}
+#plot the data from the merged table after converting it from character type (it was stored like this due to the unknown values) to numeric type
+#add labels and colors to make it look better
+ggplot(merged_data, aes(x = as.numeric(procalcitonin.ng.ml..), y = as.numeric(APOM_Expression))) +
+  geom_point(color = "brown") +
+  scale_x_continuous(n.breaks=10) +
+  labs(y = 'APOM Expression', x = 'Procalcitonin Levels (ng/mL)' ) +
+  ggtitle('APOM Expression vs. Procalcitonin Levels')
+```
+
+```{R}
+#create another merged table, this time for categorical variables
+categorical_data <- QBS103_finalProject_metadata[,c('participant_id','sex', 'icu_status')]
+colnames(categorical_data)[1] ="subject"
+
+merged_data_two <- merge(APOM_data, categorical_data, by='subject')
+
+#remove all data where sex is unknown
+merged_data_two <- subset(merged_data_two[merged_data_two$sex != ' unknown', ])
+
+#capitalize male/female and yes/no so they look better on the plot
+merged_data_two$sex <- ifelse(merged_data_two$sex == ' male', 'Male', 'Female')
+merged_data_two$icu_status <- ifelse(merged_data_two$icu_status == ' no', 'No', 'Yes')
+```
+
+```{R}
+#plot data
+ggplot(merged_data_two, aes(x = sex, y = APOM_Expression, fill = icu_status)) +
+  geom_boxplot() +
+  labs(x = 'Sex',y = 'APOM Expression Level',fill = 'ICU Status') +
+  scale_fill_brewer(palette="Dark2") + 
+  ggtitle('APOM Expression by Sex and ICU Status')
+```
+This protein is an apolipoprotein, which means that it binds lipids to create lipoproteins, combinations of proteins and lipids. Lipids, commonly known as fat molecules, are hydropohobic and insoluble in the blood. Proteins with hydrophilic domains which readily interact with the blood and hydrophobic domains which do not but attract lipids, form structures which interact with phospholipids and other molecules to expose their hydrophilic domains externally while shielding their hydrophobic domains internally, along with shielding the lipids hydrophilic domains. This allows for the lipids transport through the blood. Additionally, these proteins bind receptors only present on certain cells, allowing the lipids to be targeted to only cells with that receptor, rather than dispersed to all cells. 
+Source: https://www.ncbi.nlm.nih.gov/gene/55937
+
+APOM gene expression is not normally distributed, but centers around 4. It is not symmetrical either, with more people having lower levels of expression. 
+
+Comparing APOM gene expression to procalcitonin levels provides little insight into either variable. There is no correlation between the two, but procalcitonin levels seem to be low in most individuals while APOM expression varies. There are several outliers, none of which provide any notable information.
+
+APOM expression does not vary significantly between any combination of sex and ICU status. That is, females not in the ICU, females in the ICU, males not in the ICU and males in the ICU, have comparable levels of APOM expression. It is not likely that APOM expression is related to hospitalization. 
