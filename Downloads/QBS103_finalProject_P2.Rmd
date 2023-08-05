@@ -1,0 +1,94 @@
+---
+title: "Final Part 2"
+output: html_document
+date: "2023-08-05"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+```{R}
+library(tidyverse)
+QBS103_finalProject_geneExpression <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_geneExpression.csv")
+QBS103_finalProject_metadata <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_metadata.csv")
+```
+
+```{R}
+#function to go through a list of genes and create a histogram, scatterplot and boxplot for the data frame of interest and the gene/covariates of interest
+presentation <- function(expression.data.frame, covariate.data.frame, gene.names, continuous.covariate, categorical.covariates){
+  for (gene in gene.names){
+    #call data relevant to expression levels and initialize in a dataframe, making in long format to select only one gene
+    expression_data <- expression.data.frame[ expression.data.frame$X == gene, ] %>%
+             gather(key = subject, value = expression, 2:127)
+    
+    #create a histogram comparing expression of the gene of interest to its frequency of occurence
+    histogram = ggplot2::ggplot(expression_data, aes(x = expression)) +
+                                geom_histogram(fill = 'ForestGreen', col = I('Black')) +
+                                labs(x = substitute(paste(italic(gene), ' Gene Expression')), y = 'Number of Subjects') +
+                                ggtitle(substitute(paste(italic(gene), " Gene Expression by Frequency of Occurence"))) +
+                                theme(plot.title = element_text(hjust = 0.5))
+    print(histogram)
+    
+    
+    #call covariate data from its dataframe and merge it with expression data, matching by subject ID
+    continuous_data <- covariate.data.frame[,c('participant_id',continuous.covariate)]
+    colnames(continuous_data)[1] ="subject"
+    merged_data <- merge(expression_data, continuous_data, by='subject')
+    
+    #clean data to remove unknown values then convert continuous.covariate to a numeric form for graphing
+    merged_data <- subset(merged_data[merged_data[continuous.covariate] != 'unknown', ])
+    merged_data[continuous.covariate] <- as.numeric(unlist(merged_data[continuous.covariate]))
+
+    #plot the data with continuous.covariate on the x-axis and expression on the y-axis
+    scatterplot = ggplot2::ggplot(merged_data, aes_string(x = continuous.covariate, y = "expression")) +
+                                geom_point(color = "brown", alpha = 0.2) +
+                                labs(y = substitute(paste(italic(gene), ' Gene Expression')), x = paste(continuous.covariate, 'Levels' )) +
+                                ggtitle(substitute(paste(italic(gene), ' Gene Expression vs. ', continuous.covariate, ' Levels'))) +
+                                theme(plot.title = element_text(hjust = 0.5))
+    print(scatterplot)
+    
+    
+    #create another merged table, this time for the categorical variables
+    categorical_data <- covariate.data.frame[,c(c('participant_id'),categorical.covariates)]
+    colnames(categorical_data)[1] ="subject"
+    merged_data_two <- merge(expression_data, categorical_data, by='subject')
+    
+    #remove all data where either categorical covariate is unknown
+    merged_data_two <- subset(merged_data_two[merged_data_two[categorical.covariates[1]] != ' unknown', ])
+    merged_data_two <- subset(merged_data_two[merged_data_two[categorical.covariates[2]] != ' unknown', ])
+    
+    #name 2 variables to use in paste function
+    categorical.covariate1 = categorical.covariates[1]
+    categorical.covariate2 = categorical.covariates[2]
+    
+    #plot data
+    boxplot = ggplot2::ggplot(merged_data_two, aes_string(x = categorical.covariates[1], y = 'expression', fill = categorical.covariates[2])) +
+                              geom_boxplot() +
+                              labs(x = categorical.covariates[1],y = substitute(paste(italic(gene), ' Gene Expression')),
+                                   fill = categorical.covariates[2]) +
+                              scale_fill_brewer(palette="Dark2") + 
+                              ggtitle(substitute(paste(italic(gene), ' Gene Expression by ', categorical.covariate1, ' and ', categorical.covariate2)))
+    print(boxplot)
+  }
+}
+```
+
+```{R}
+presentation(QBS103_finalProject_geneExpression, QBS103_finalProject_metadata, c('APOM','DEFA1','DEFA4'),
+             'fibrinogen', c('disease_status','icu_status'))
+```
+
+
+sources:
+https://r-lang.com/how-to-convert-list-to-numeric-value-in-r/
+https://stackoverflow.com/questions/22309285/how-to-use-a-variable-to-specify-column-name-in-ggplot\
+https://www.geeksforgeeks.org/how-to-use-italic-font-in-r/
+https://stackoverflow.com/questions/40675778/center-plot-title-in-ggplot2
+
