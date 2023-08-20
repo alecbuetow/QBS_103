@@ -1,0 +1,233 @@
+---
+title: "Final Project Part 3"
+output: html_document
+date: "2023-08-20"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+## R Markdown
+
+This is an R Markdown document. Markdown is a simple formatting syntax for authoring HTML, PDF, and MS Word documents. For more details on using R Markdown see <http://rmarkdown.rstudio.com>.
+
+When you click the **Knit** button a document will be generated that includes both content as well as the output of any embedded R code chunks within the document. You can embed an R code chunk like this:
+
+
+```{R}
+QBS103_finalProject_geneExpression <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_geneExpression.csv")
+QBS103_finalProject_geneExpression
+```
+
+```{R}
+QBS103_finalProject_metadata <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_metadata.csv")
+QBS103_finalProject_metadata
+```
+
+```{R}
+continuous_data <- QBS103_finalProject_metadata[,c('participant_id','procalcitonin.ng.ml..','fibrinogen','ventilator.free_days','ferritin.ng.ml.')]
+continuous_data
+
+categorical_data <- QBS103_finalProject_metadata[,c('participant_id','sex', 'icu_status','mechanical_ventilation')]
+categorical_data
+
+data <- merge(categorical_data,continuous_data, by = 'participant_id')
+data
+```
+
+```{R}
+buildTableOne <- function(data, varList, nonnormVars, catVars){
+  table1 <- data.frame('Variable' = c(), 'Value' = c())
+  
+  for (var in varList){
+    input = data[, var]
+    
+    if (var %in% nonnormVars){
+      input <- as.numeric(unlist(input))
+      input <- input[!is.na(input)]
+      myMedian <- median(input)
+      myIQR1 <- quantile(input,1/4, na.rm = TRUE)
+      myIQR2 <- quantile(input,3/4, na.rm = TRUE)
+      tempTable <- data.frame('Variable' = c(var,'Median [Quartile 1, Quartile 3]'),
+                              'Value' = c('',paste(round(myMedian, 2),' [',round(myIQR1, 2),', ',round(myIQR2, 2),']', sep="")))
+      table1 <- rbind(table1,tempTable)
+      
+    } else if (var %in% catVars){
+      count1 = length(which(input == ' yes'))
+      count2 = length(which(input == ' no'))
+      tempTable <- data.frame('Variable' = c(var,'Yes','No'),
+                              'Value' = c('',paste(count1, ' (', round(100*count1/(count1+count2),1), '%)', sep=""),
+                                             paste(count2, ' (', round(100*count2/(count1+count2),1), '%)', sep="")))
+      table1 <- rbind(table1,tempTable)
+
+    } else {
+      input <- as.numeric(unlist(input))
+      input <- input[!is.na(input)]
+      print(input)
+      tempTable <- data.frame('Variable' = c(var,'Mean (Standard Deviation)'),
+                              'Value' = c('',paste(round(mean(input),2),' (',round(sd(input),2), ')', sep="")))
+      table1 <- rbind(table1,tempTable)
+      
+    }
+  }
+  return(table1)
+}
+```
+
+```{R}
+table <- data.frame('Variable' = c('Male'), 'Value' = c(''))
+
+male_table <- buildTableOne(data[which(data['sex'] == ' male'), ], c('icu_status','mechanical_ventilation',
+                            'procalcitonin.ng.ml..','fibrinogen','ventilator.free_days','ferritin.ng.ml.'), c('procalcitonin.ng.ml..',                                           'ventilator.free_days','ferritin.ng.ml.'), c('icu_status','mechanical_ventilation'))
+
+table <- rbind(table, male_table)
+table <- rbind(table, data.frame('Variable' = c('Female'), 'Value' = c('')))
+
+female_table <- buildTableOne(data[which(data['sex'] == ' female'), ], c('icu_status','mechanical_ventilation',
+                            'procalcitonin.ng.ml..','fibrinogen','ventilator.free_days','ferritin.ng.ml.'), c('procalcitonin.ng.ml..',                                           'ventilator.free_days','ferritin.ng.ml.'), c('icu_status','mechanical_ventilation'))
+table <- rbind(table, female_table)
+table$Variable <- c("Male", "ICU Status", "In ICU", "Not in ICU", "Mechanical Ventilation", "Undergoing Ventilation", "Ventilation Absent",
+                    "Procalcitonin (ng/mL)", 
+                    "Median [Quartile 1, Quartile 3]", "Fibrinogen", "Mean (Standard Deviation)", "Ventilator Free Days", 
+                    "Median [Quartile 1, Quartile 3]", "Ferritin (ng/mL)", "Median [Quartile 1, Quartile 3]", 
+                    "Female", "ICU Status", "In ICU", "Not in ICU", "Mechanical Ventilation", "Undergoing Ventilation", "Ventilation Absent",
+                    "Procalcitonin (ng/mL)", 
+                    "Median [Quartile 1, Quartile 3]", "Fibrinogen", "Mean (Standard Deviation)", "Ventilator Free Days", 
+                    "Median [Quartile 1, Quartile 3]", "Ferritin (ng/mL)", "Median [Quartile 1, Quartile 3]")
+```
+
+```{R}
+library(kableExtra)
+
+kable(x = table, caption = 'Table 1',
+      col.names = c("Variable", "Value"),
+      align = c('l','r'),escape = T) %>%
+   add_indent(positions = c(2,3,3,4,4,5,6,6,7,7,8,9,9,10,11,11,12,13,13,14,15,15,17,18,18,19,19,20,21,21,22,22,23,24,24,25,26,26,27,28,28,29,30,30)) %>%
+  kable_styling(full_width = F) %>%
+  row_spec(c(1,2,5,8,10,12,14,16,17,20,23,25,27,29),bold=T) %>%
+  kable_classic()
+```
+
+```{R}
+library(tidyverse)
+
+#select the gene of interest and convert it into a long format for use in tidyverse plot functions
+APOM_data <- QBS103_finalProject_geneExpression[ QBS103_finalProject_geneExpression$X == 'APOM', ] %>%
+             gather(key = subject, value = APOM_Expression, 2:127)
+
+#plot data as a histogram and choose colors / labels
+ggplot2::ggplot(APOM_data, aes(x = APOM_Expression)) +
+  geom_histogram(fill = 'ForestGreen', col = I('Black')) +
+  labs(x = substitute(paste(italic('APOM'), ' Gene Expression (Logarithmic Scale)')), y = 'Number of Participants') +
+  ggtitle(substitute(paste(italic('APOM'), " Gene Expression by Frequency of Occurence"))) + 
+  theme(plot.title = element_text(hjust = 0.5))
+```
+
+```{R}
+#create a dataframe for the continuous variable and rename a column to match the APOM dataframe
+procalcitonin_data <- QBS103_finalProject_metadata[,c('participant_id','procalcitonin.ng.ml..')]
+colnames(procalcitonin_data)[1] ="subject"
+
+#merge the dataframes using the matched column name
+merged_data <- merge(APOM_data, procalcitonin_data, by='subject')
+
+#note that a row is lost due to a mismatch between the datasets
+#COVID_06_.y_male_NonICU in APOM_Expression does not match COVID_06_:y_male_NonICU in procalcitonin
+#in both cases an age is not present, so I opted to exclude this data assuming it was erroneous 
+
+#consider only data with known procalcitonin values, since unkown values cannot be plotted
+merged_data <- subset(merged_data[merged_data$procalcitonin.ng.ml != 'unknown', ])
+
+#plot the data from the merged table after converting it from character type (it was stored like this due to the unknown values) to numeric type
+#add labels and colors to make it look better
+ggplot(merged_data, aes(x = as.numeric(procalcitonin.ng.ml..), y = as.numeric(APOM_Expression))) +
+  geom_point(color = "brown", alpha = 0.2) +
+  scale_x_continuous(n.breaks=10) +
+  labs(y = substitute(paste(italic('APOM'), ' Gene Expression (Logarithmic Scale)')), x = 'Procalcitonin Levels (ng/mL)' ) +
+  ggtitle(substitute(paste(italic('APOM'), ' Gene Expression vs. Procalcitonin Levels'))) +
+  theme_bw() +
+  #theme(plot.background = element_rect(fill = "lightgray")) + 
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+```{R}
+#create another merged table, this time for categorical variables
+categorical_data <- QBS103_finalProject_metadata[,c('participant_id','sex', 'icu_status')]
+colnames(categorical_data)[1] ="subject"
+
+merged_data_two <- merge(APOM_data, categorical_data, by='subject')
+
+#remove all data where sex is unknown
+merged_data_two <- subset(merged_data_two[merged_data_two$sex != ' unknown', ])
+
+#capitalize male/female and yes/no so they look better on the plot
+merged_data_two$sex <- ifelse(merged_data_two$sex == ' male', 'Male', 'Female')
+merged_data_two$icu_status <- ifelse(merged_data_two$icu_status == ' no', 'In ICU', 'Not in ICU')
+```
+
+```{R}
+#plot data
+ggplot(merged_data_two, aes(x = sex, y = APOM_Expression, fill = icu_status)) +
+  geom_boxplot() +
+  labs(x = 'Sex',y = substitute(paste(italic('APOM'), ' Expression (Logarithmic Scale)')),fill = 'ICU Status') +
+  scale_fill_brewer(palette="Dark2") + 
+  ggtitle(substitute(paste(italic('APOM'), ' Expression by Sex and ICU Status'))) +
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+
+```{R}
+library(pheatmap)
+heatmap.df <- QBS103_finalProject_geneExpression[,-1]
+rownames(heatmap.df) <- QBS103_finalProject_geneExpression[,1]
+
+catergorical.annotation <- QBS103_finalProject_metadata[QBS103_finalProject_metadata$participant_id %in% colnames( heatmap.df[1:40] ), ]
+annotation <- QBS103_finalProject_metadata[c('mechanical_ventilation','icu_status')]
+annotation$mechanical_ventilation <- ifelse(annotation$mechanical_ventilation == ' yes', 'Undergoing Ventilation','Ventilation Absent')
+annotation$icu_status <- ifelse(annotation$icu_status == ' yes', 'In the ICU','Not in the ICU')
+colnames(annotation) <- c('Ventilation','ICU Status')
+rownames(annotation) <- QBS103_finalProject_metadata$participant_id
+
+pheatmap(heatmap.df[1:10,10:20],
+         clustering_distance_cols = 'euclidean',
+         clustering_distance_rows = 'euclidean',
+         annotation_col = annotation,
+         annotation_colors = list('ICU Status' = c('In the ICU' = 'mediumorchid', 'Not in the ICU' = 'mediumvioletred'),
+                                  'Ventilation' = c('Ventilation Absent' = 'lightslateblue', 'Undergoing Ventilation' = 'blueviolet'))) +
+         
+```
+
+```{R}
+library(dplyr)
+colnames(annotation) <- c('Ventilation','ICU_Status')
+pie.data <- dplyr::count_(annotation, vars = c('Ventilation','ICU_Status'))
+
+ggplot(pie.data, aes(x=ICU_Status, y=n, fill=Ventilation)) +
+  geom_bar(stat="identity") +
+  scale_fill_brewer(palette="Pastel2") +
+  labs(x = 'ICU Status', y = 'Number of Patients') +
+  ggtitle('Number of Patients by ICU and Ventilation Status') +
+  theme(plot.title = element_text(hjust = 0.5)) 
+```
+
+```{R}
+annotation
+```
+
+```{R}
+N <- 10000
+
+d <- data.frame(
+  ID=seq(1, N), 
+  v1=sample(c("M","F", "M", "L"), N, replace = TRUE), 
+  v2=sample(c("D","M","D","D"), N, replace = TRUE), 
+  v3=sample(c("F","G","F","E"), N, replace = TRUE),
+  v4=sample(c("A","B","A","B"), N, replace = TRUE)
+)
+
+d
+dplyr::count_(d, vars = c('v1','v2','v3','v4'))
+```
+
+```{R}
+
+```
