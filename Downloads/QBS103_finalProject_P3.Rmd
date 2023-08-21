@@ -16,27 +16,33 @@ When you click the **Knit** button a document will be generated that includes bo
 
 
 ```{R}
+#load the data
 QBS103_finalProject_geneExpression <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_geneExpression.csv")
 QBS103_finalProject_geneExpression
 ```
 
 ```{R}
+#load the data
 QBS103_finalProject_metadata <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_metadata.csv")
 QBS103_finalProject_metadata
 ```
 
 ```{R}
+#subset the data for no real reason. Initially I wasn't going to merge the two but it was easier this way
 continuous_data <- QBS103_finalProject_metadata[,c('participant_id','procalcitonin.ng.ml..','fibrinogen','ventilator.free_days','ferritin.ng.ml.')]
 continuous_data
 
 categorical_data <- QBS103_finalProject_metadata[,c('participant_id','sex', 'icu_status','mechanical_ventilation')]
 categorical_data
 
+#only the columns of interest
 data <- merge(categorical_data,continuous_data, by = 'participant_id')
 data
 ```
 
 ```{R}
+#redefine a function we did previously
+#fix it to allow it to take rows with charcters and incomplete data
 buildTableOne <- function(data, varList, nonnormVars, catVars){
   table1 <- data.frame('Variable' = c(), 'Value' = c())
   
@@ -76,17 +82,24 @@ buildTableOne <- function(data, varList, nonnormVars, catVars){
 ```
 
 ```{R}
+#initialize an empty table
 table <- data.frame('Variable' = c('Male'), 'Value' = c(''))
 
+#create the data of interest only for men
 male_table <- buildTableOne(data[which(data['sex'] == ' male'), ], c('icu_status','mechanical_ventilation',
                             'procalcitonin.ng.ml..','fibrinogen','ventilator.free_days','ferritin.ng.ml.'), c('procalcitonin.ng.ml..',                                           'ventilator.free_days','ferritin.ng.ml.'), c('icu_status','mechanical_ventilation'))
 
 table <- rbind(table, male_table)
 table <- rbind(table, data.frame('Variable' = c('Female'), 'Value' = c('')))
 
+#create the data of interest only for women
 female_table <- buildTableOne(data[which(data['sex'] == ' female'), ], c('icu_status','mechanical_ventilation',
                             'procalcitonin.ng.ml..','fibrinogen','ventilator.free_days','ferritin.ng.ml.'), c('procalcitonin.ng.ml..',                                           'ventilator.free_days','ferritin.ng.ml.'), c('icu_status','mechanical_ventilation'))
+
+#bind everything to one table so it shows together
 table <- rbind(table, female_table)
+
+#rename everything to look cleaner
 table$Variable <- c("Male", "ICU Status", "In ICU", "Not in ICU", "Mechanical Ventilation", "Undergoing Ventilation", "Ventilation Absent",
                     "Procalcitonin (ng/mL)", 
                     "Median [Quartile 1, Quartile 3]", "Fibrinogen", "Mean (Standard Deviation)", "Ventilator Free Days", 
@@ -100,6 +113,8 @@ table$Variable <- c("Male", "ICU Status", "In ICU", "Not in ICU", "Mechanical Ve
 ```{R}
 library(kableExtra)
 
+#use kable to make a nice knitted table
+#indents and bold make everything clearer
 kable(x = table, caption = 'Table 1',
       col.names = c("Variable", "Value"),
       align = c('l','r'),escape = T) %>%
@@ -177,31 +192,37 @@ ggplot(merged_data_two, aes(x = sex, y = APOM_Expression, fill = icu_status)) +
 
 ```{R}
 library(pheatmap)
+#create a new df with gene names as the row names instead of as a column
 heatmap.df <- QBS103_finalProject_geneExpression[,-1]
 rownames(heatmap.df) <- QBS103_finalProject_geneExpression[,1]
 
-catergorical.annotation <- QBS103_finalProject_metadata[QBS103_finalProject_metadata$participant_id %in% colnames( heatmap.df[1:40] ), ]
+#select the 2 categorical variables of interest and rename them to be more aesthetic
 annotation <- QBS103_finalProject_metadata[c('mechanical_ventilation','icu_status')]
 annotation$mechanical_ventilation <- ifelse(annotation$mechanical_ventilation == ' yes', 'Undergoing Ventilation','Ventilation Absent')
 annotation$icu_status <- ifelse(annotation$icu_status == ' yes', 'In the ICU','Not in the ICU')
 colnames(annotation) <- c('Ventilation','ICU Status')
+#this is to ensure the annotations can map to the heatmap data properly
 rownames(annotation) <- QBS103_finalProject_metadata$participant_id
 
+#plot the heatmap wit euclidean distance as the clustering technique
 pheatmap(heatmap.df[1:10,10:20],
          clustering_distance_cols = 'euclidean',
          clustering_distance_rows = 'euclidean',
          annotation_col = annotation,
          annotation_colors = list('ICU Status' = c('In the ICU' = 'mediumorchid', 'Not in the ICU' = 'mediumvioletred'),
-                                  'Ventilation' = c('Ventilation Absent' = 'lightslateblue', 'Undergoing Ventilation' = 'blueviolet'))) +
+                                  'Ventilation' = c('Ventilation Absent' = 'lightslateblue', 'Undergoing Ventilation' = 'blueviolet')))
          
 ```
 
 ```{R}
 library(dplyr)
+#rename annotation because count_ doesn't work with a space
 colnames(annotation) <- c('Ventilation','ICU_Status')
-pie.data <- dplyr::count_(annotation, vars = c('Ventilation','ICU_Status'))
+#count all of the combinations of ventilation and ICU status
+bar.data <- dplyr::count_(annotation, vars = c('Ventilation','ICU_Status'))
 
-ggplot(pie.data, aes(x=ICU_Status, y=n, fill=Ventilation)) +
+#plot the combinations as a bar chart
+ggplot(bar.data, aes(x=ICU_Status, y=n, fill=Ventilation)) +
   geom_bar(stat="identity") +
   scale_fill_brewer(palette="Pastel2") +
   labs(x = 'ICU Status', y = 'Number of Patients') +
@@ -209,25 +230,3 @@ ggplot(pie.data, aes(x=ICU_Status, y=n, fill=Ventilation)) +
   theme(plot.title = element_text(hjust = 0.5)) 
 ```
 
-```{R}
-annotation
-```
-
-```{R}
-N <- 10000
-
-d <- data.frame(
-  ID=seq(1, N), 
-  v1=sample(c("M","F", "M", "L"), N, replace = TRUE), 
-  v2=sample(c("D","M","D","D"), N, replace = TRUE), 
-  v3=sample(c("F","G","F","E"), N, replace = TRUE),
-  v4=sample(c("A","B","A","B"), N, replace = TRUE)
-)
-
-d
-dplyr::count_(d, vars = c('v1','v2','v3','v4'))
-```
-
-```{R}
-
-```
