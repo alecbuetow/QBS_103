@@ -18,26 +18,26 @@ When you click the **Knit** button a document will be generated that includes bo
 ```{R}
 #load the data
 QBS103_finalProject_geneExpression <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_geneExpression.csv")
-QBS103_finalProject_geneExpression
+#QBS103_finalProject_geneExpression
 ```
 
 ```{R}
 #load the data
 QBS103_finalProject_metadata <- read.csv("C:\\Users\\pepea\\Downloads\\QBS103_finalProject_metadata.csv")
-QBS103_finalProject_metadata
+#QBS103_finalProject_metadata
 ```
 
 ```{R}
 #subset the data for no real reason. Initially I wasn't going to merge the two but it was easier this way
 continuous_data <- QBS103_finalProject_metadata[,c('participant_id','procalcitonin.ng.ml..','fibrinogen','ventilator.free_days','ferritin.ng.ml.')]
-continuous_data
+#continuous_data
 
 categorical_data <- QBS103_finalProject_metadata[,c('participant_id','sex', 'icu_status','mechanical_ventilation')]
-categorical_data
+#categorical_data
 
 #only the columns of interest
 data <- merge(categorical_data,continuous_data, by = 'participant_id')
-data
+#data
 ```
 
 ```{R}
@@ -109,19 +109,26 @@ table$Variable <- c("Male", "ICU Status", "In ICU", "Not in ICU", "Mechanical Ve
                     "Median [Quartile 1, Quartile 3]", "Fibrinogen", "Mean (Standard Deviation)", "Ventilator Free Days", 
                     "Median [Quartile 1, Quartile 3]", "Ferritin (ng/mL)", "Median [Quartile 1, Quartile 3]")
 ```
+```{R}
+#webshot::install_phantomjs()
+```
 
 ```{R}
 library(kableExtra)
 
 #use kable to make a nice knitted table
 #indents and bold make everything clearer
-kable(x = table, caption = 'Table 1',
+kable.table <- kable(x = table, caption = 'Table 1',
       col.names = c("Variable", "Value"),
       align = c('l','r'),escape = T) %>%
-   add_indent(positions = c(2,3,3,4,4,5,6,6,7,7,8,9,9,10,11,11,12,13,13,14,15,15,17,18,18,19,19,20,21,21,22,22,23,24,24,25,26,26,27,28,28,29,30,30)) %>%
+   add_indent(positions = c(2,3,3,4,4,5,6,6,7,7,8,9,9,10,11,11,12,13,13,14,15,
+                            15,17,18,18,19,19,20,21,21,22,22,23,24,24,25,26,26,27,28,28,29,30,30)) %>%
   kable_styling(full_width = F) %>%
   row_spec(c(1,2,5,8,10,12,14,16,17,20,23,25,27,29),bold=T) %>%
   kable_classic()
+
+#save_kable(kable.table, '000020.png')
+kable.table
 ```
 
 ```{R}
@@ -200,17 +207,19 @@ rownames(heatmap.df) <- QBS103_finalProject_geneExpression[,1]
 annotation <- QBS103_finalProject_metadata[c('mechanical_ventilation','icu_status')]
 annotation$mechanical_ventilation <- ifelse(annotation$mechanical_ventilation == ' yes', 'Undergoing Ventilation','Ventilation Absent')
 annotation$icu_status <- ifelse(annotation$icu_status == ' yes', 'In the ICU','Not in the ICU')
-colnames(annotation) <- c('Ventilation','ICU Status')
+colnames(annotation) <- c('Ventilation                  ','ICU Status                  ')
 #this is to ensure the annotations can map to the heatmap data properly
 rownames(annotation) <- QBS103_finalProject_metadata$participant_id
 
-#plot the heatmap wit euclidean distance as the clustering technique
-pheatmap(heatmap.df[1:10,10:20],
+#plot the heatmap with euclidean distance as the clustering technique
+#log scale not used because so many expressions were 0, creating -infinity values
+pheatmap(log(t(heatmap.df[1:10, ] + 0.1)),
          clustering_distance_cols = 'euclidean',
          clustering_distance_rows = 'euclidean',
-         annotation_col = annotation,
-         annotation_colors = list('ICU Status' = c('In the ICU' = 'mediumorchid', 'Not in the ICU' = 'mediumvioletred'),
-                                  'Ventilation' = c('Ventilation Absent' = 'lightslateblue', 'Undergoing Ventilation' = 'blueviolet')))
+         annotation_row = annotation,
+         show_rownames = FALSE,
+         annotation_colors = list('ICU Status                  ' = c('In the ICU' = 'mediumorchid', 'Not in the ICU' = 'mediumvioletred'),
+                                  'Ventilation                  ' = c('Ventilation Absent' = 'lightslateblue', 'Undergoing Ventilation' = 'blueviolet')))
          
 ```
 
